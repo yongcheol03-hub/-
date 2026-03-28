@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Copy of 미세먼지어플",
+  "description": "(초)미세먼지 자동측정기 RAW DATA 입력 및 관리 어플리케이션",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
