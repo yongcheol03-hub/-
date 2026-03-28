@@ -73,6 +73,9 @@ const FormView: React.FC = () => {
   const [isCameraLoading, setIsCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [ocrTarget, setOcrTarget] = useState<keyof RawDataForm | null>(null);
+  const [ocrInitialImage, setOcrInitialImage] = useState<string | undefined>(undefined);
+  const [showFieldSelector, setShowFieldSelector] = useState(false);
+  const [pendingOcrImage, setPendingOcrImage] = useState<string | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -343,21 +346,75 @@ const FormView: React.FC = () => {
     if (loadFileInputRef.current) loadFileInputRef.current.value = '';
   };
 
-  const handleScanClick = (target: keyof RawDataForm) => {
+  const handleScanClick = (target: keyof RawDataForm, initialImage?: string) => {
     stopCamera();
     setOcrTarget(target);
+    setOcrInitialImage(initialImage);
   };
 
   return (
     <div className="flex flex-col h-full font-sans bg-white text-slate-900 relative">
       
+      {/* Field Selector Modal for Preview OCR */}
+      {showFieldSelector && (
+        <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800">입력할 항목 선택</h3>
+              <button onClick={() => setShowFieldSelector(false)} className="p-1 hover:bg-slate-200 rounded-full">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
+              {[
+                { id: 'receptionNumber', label: '접수번호' },
+                { id: 'testLocation', label: '시험장소' },
+                { id: 'model', label: '모델' },
+                { id: 'serialNumber', label: '제조번호' },
+                { id: 'inspectStartDate', label: '시작일' },
+                { id: 'inspectEndDate', label: '종료일' },
+                { id: 'spanFilm', label: '스팬필름' },
+                { id: 'midFilm', label: '중간필름' },
+                { id: 'span1', label: '스팬1' },
+                { id: 'flowRate', label: '유량' },
+                { id: 'repeat1', label: '반복1' },
+                { id: 'linearity', label: '직선성' },
+                { id: 'repeat2', label: '반복2' },
+                { id: 'blank1', label: '공시험1' },
+                { id: 'repeat3', label: '반복3' },
+                { id: 'blank2', label: '공시험2' },
+                { id: 'span2', label: '스팬2' },
+                { id: 'blank3', label: '공시험3' },
+              ].map(field => (
+                <button
+                  key={field.id}
+                  onClick={() => {
+                    handleScanClick(field.id as keyof RawDataForm, pendingOcrImage!);
+                    setShowFieldSelector(false);
+                    setPendingOcrImage(null);
+                  }}
+                  className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all text-left"
+                >
+                  {field.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* OCR Modal */}
       {ocrTarget && (
         <OCRModal 
-          onClose={() => setOcrTarget(null)}
+          onClose={() => {
+            setOcrTarget(null);
+            setOcrInitialImage(undefined);
+          }}
+          initialImage={ocrInitialImage}
           onResult={(text) => {
             handleInputChange(ocrTarget, text);
             setOcrTarget(null);
+            setOcrInitialImage(undefined);
           }}
         />
       )}
@@ -409,8 +466,8 @@ const FormView: React.FC = () => {
 
       {/* Fullscreen Camera UI */}
       {showCamera && (
-          <div className="fixed inset-0 z-50 bg-black flex flex-col animate-in fade-in duration-300">
-              <div className="flex justify-between items-center p-4 text-white bg-black/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 bg-black flex flex-col animate-in fade-in duration-300 overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 z-20 flex justify-between items-center p-4 text-white bg-gradient-to-b from-black/60 to-transparent backdrop-blur-sm">
                   <div className="flex flex-col">
                     <span className="font-bold text-lg">현장 촬영 모드</span>
                     <span className="text-xs text-blue-400">SITE {activeSite} 에 저장됩니다</span>
@@ -420,7 +477,7 @@ const FormView: React.FC = () => {
                   </button>
               </div>
 
-              <div className="flex-1 relative bg-slate-900 flex items-center justify-center overflow-hidden">
+              <div className="absolute inset-0 bg-slate-900 flex items-center justify-center overflow-hidden">
                   <video
                       ref={videoRef}
                       autoPlay
@@ -440,38 +497,44 @@ const FormView: React.FC = () => {
                   )}
               </div>
 
-              <div className="h-40 bg-black flex flex-col items-center justify-center gap-4 pb-8">
-                  <div className="flex items-center gap-12">
+              <div className="absolute bottom-10 left-0 right-0 z-30 flex flex-col items-center gap-6">
+                  <div className="flex items-center justify-center gap-12 md:gap-24">
                       <button 
                         onClick={() => fileInputRef.current?.click()}
-                        className="p-4 bg-white/10 rounded-full text-white hover:bg-white/20"
+                        className="p-5 bg-white/20 rounded-full text-white hover:bg-white/30 backdrop-blur-xl border border-white/30 shadow-2xl active:scale-95 transition-all"
                       >
-                          <ImagePlus size={28} />
+                          <ImagePlus size={32} />
                       </button>
                       
                       <button 
                           onClick={capturePhoto}
-                          className="w-24 h-24 rounded-full bg-white flex items-center justify-center active:scale-90 transition-transform border-8 border-gray-600"
+                          className="group relative flex items-center justify-center"
                       >
-                          <div className="w-16 h-16 rounded-full border-4 border-black bg-white"></div>
+                          <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-white p-2 shadow-[0_0_50px_rgba(255,255,255,0.3)] active:scale-90 transition-all">
+                            <div className="w-full h-full rounded-full border-4 border-slate-900 flex items-center justify-center bg-slate-50">
+                               <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600/20 animate-pulse"></div>
+                            </div>
+                          </div>
+                          <span className="absolute -bottom-8 text-white text-xs font-black tracking-widest bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">CAPTURE</span>
                       </button>
 
                       <button 
                           onClick={() => { stopCamera(); startCamera(); }}
-                          className="p-4 bg-white/10 rounded-full text-white hover:bg-white/20"
+                          className="p-4 bg-white/10 rounded-full text-white hover:bg-white/20 backdrop-blur-md border border-white/10"
                       >
                           <RotateCcw size={28} />
                       </button>
                   </div>
-                  <span className="text-white/50 text-sm">첨부된 사진: {currentData.attachedImages.length}개</span>
+                  <span className="text-white/70 text-sm font-bold drop-shadow-md">첨부된 사진: {currentData.attachedImages.length}개</span>
               </div>
           </div>
       )}
 
       <header className="border-b shadow-sm sticky top-0 z-20 bg-white border-gray-300">
         <div className="p-4 flex items-center justify-between">
-             <h1 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 truncate">
+             <h1 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 truncate flex items-center gap-2">
                 RAW DATA 관리 시스템
+                <span className="text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-mono">v2.1.0</span>
             </h1>
             <button 
                 onClick={startCamera}
@@ -629,6 +692,7 @@ const FormView: React.FC = () => {
                             <span className="text-sm font-black text-gray-700 flex items-center gap-2">
                                 <FileCheck size={16} className="text-blue-600" />
                                 첨부 사진 미리보기 ({currentData.attachedImages.length})
+                                <span className="bg-blue-600 text-white text-[8px] px-1.5 py-0.5 rounded-full animate-pulse">NEW</span>
                             </span>
                             <button 
                                 onClick={clearImages}
@@ -637,19 +701,34 @@ const FormView: React.FC = () => {
                                 전체 삭제
                             </button>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 pb-2">
+                        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-2">
                             {currentData.attachedImages.map((img, idx) => (
-                                <div key={idx} className="relative aspect-square border-2 border-gray-200 bg-gray-50 rounded-md overflow-hidden group">
+                                <div key={idx} className="relative aspect-square border-2 border-gray-200 bg-gray-50 rounded-xl overflow-hidden group shadow-sm">
                                     <img 
                                         src={img.dataUrl} 
                                         alt={`preview-${idx}`} 
                                         className="w-full h-full object-cover"
                                     />
                                     <button 
-                                        onClick={() => removeSpecificImage(idx)}
-                                        className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-red-600 transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            removeSpecificImage(idx);
+                                        }}
+                                        className="absolute top-2 right-2 p-2 bg-black/60 text-white rounded-full hover:bg-red-600 transition-colors z-20 shadow-lg"
                                     >
-                                        <X size={12} />
+                                        <X size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPendingOcrImage(img.dataUrl);
+                                            setShowFieldSelector(true);
+                                        }}
+                                        className="absolute top-2 left-2 p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all z-30 shadow-[0_4px_12px_rgba(37,99,235,0.4)] active:scale-95 flex items-center gap-1"
+                                        title="이 사진으로 OCR 인식"
+                                    >
+                                        <Scan size={20} strokeWidth={3} />
+                                        <span className="text-[10px] font-black">SCAN</span>
                                     </button>
                                     <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-[8px] text-white px-1 py-0.5 truncate font-mono">
                                         {img.name}

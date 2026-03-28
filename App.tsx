@@ -158,7 +158,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center">
-      <div className="w-full max-w-md bg-white shadow-2xl overflow-hidden min-h-screen flex flex-col">
+      <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl bg-white shadow-2xl overflow-hidden min-h-screen flex flex-col">
         <FormView />
       </div>
     </div>
